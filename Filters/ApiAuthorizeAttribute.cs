@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Helpers;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -32,6 +33,18 @@ namespace WebApiHelpers.Filters
             IEnumerable<string> values = null;
             if (actionContext.Request.Headers.TryGetValues("ticket", out values))
             {
+                if (values.First().StartsWith("Pay_"))
+                {
+                    string _Ticket = values.First().Replace("Pay_", "");
+                    if(MD51.PwdIsRight(_Ticket, "sz06181102#@!"))
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
                 //如果获取到
                 return actionContext.IsLogin();
                 //判断是否登录

@@ -22,6 +22,14 @@ public class ResultBadModel<T> : ResultBasicModel
 {
     public T data { get; set; }
 }
+public class KeyModel
+{
+    public string Key { get; set; }
+}
+public class KeysModel
+{
+    public string Keys { get; set; }
+}
 public class BasicApiController : ApiController
 {
     public IHttpActionResult Error(string msg)

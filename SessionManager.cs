@@ -9,151 +9,203 @@ using System.Threading.Tasks;
 using System.Web.Http.Controllers;
 
 
-    public static class SessionManager
+public static class SessionManager
+{
+    private static List<SessionModel> list;
+    private static object lockObj = new object();
+    public static int SessionOutTimer = 50;
+    public static int SessionClearTimer = 60 * 12;
+    private static TimerTaskService timer;
+    static SessionManager()
     {
-        private static List<SessionModel> list;
-        private static object lockObj = new object();
-        public static int SessionOutTimer = 50;
-        public static int SessionClearTimer = 60 * 12;
-        private static TimerTaskService timer;
-        static SessionManager()
-        {
-            list = new List<SessionModel>();
-
-            timer = TimerTaskService.CreateTimerTaskService(new TimerInfo { TimerType = TimerType.LoopStop, Hour = 1 }, () =>
+        list = new List<SessionModel>();
+        timer = TimerTaskService.CreateTimerTaskService(new TimerInfo { TimerType = TimerType.LoopStop, Hour = 1 }, () =>
+         {
+             lock (lockObj)
              {
-                 lock (lockObj)
-                 {
-                     list.RemoveAll(r => (DateTime.Now - r.LastOprTime) > new TimeSpan(0, SessionOutTimer, 0));
-                 }
-             });
-            timer.Start();
+                 list.RemoveAll(r => (DateTime.Now - r.LastOprTime) > new TimeSpan(0, SessionOutTimer, 0));
+             }
+         });
+        timer.Start();
+    }
+    public static string GetTicket(this HttpActionContext actionContext)
+    {
+        lock (lockObj)
+        {
+            string ticket = GetHeadersTicket(actionContext);
+
+            SessionModel model = new SessionModel();
+            model.TimeOut = false;
+            model.Obj = null;
+            if (string.IsNullOrEmpty(ticket) || !list.Any(a => a.Ticket == ticket))
+            {
+                model.Ticket = Guid.NewGuid().ToString().Replace("-", "");
+            }
+            else
+            {
+                model.Ticket = ticket;
+            }
+
+            model.LastOprTime = DateTime.Now;
+            model.SessionData = new Hashtable();
+            lock (lockObj)
+            {
+                list.Add(model);
+            }
+            return model.Ticket;
         }
-        public static string NewUser(this HttpActionContext actionContext)
+    }
+    public static void Login<T>(this HttpActionContext actionContext,T userInfo, string userKey)
+    {
+        string ticket = GetHeadersTicket(actionContext);
+        var tmp = list.Find(a => a.Ticket == ticket);
+        if (tmp != null)
         {
             lock (lockObj)
             {
-                SessionModel model = new SessionModel();
-                model.TimeOut = false;
-                model.Obj = null;
-                model.Ticket = Guid.NewGuid().ToString().Replace("-", "");
-                model.LastOprTime = DateTime.Now;
-                model.sessionData = new Hashtable();
-                lock (lockObj)
-                {
-                    list.Add(model);
-                }
-                return model.Ticket;
+                tmp.LastOprTime = DateTime.Now;
+                tmp.TimeOut = false;
+                tmp.UserKey = userKey;
+                tmp.Obj = userInfo;
+            }
+
+        }
+        else
+        {
+            SessionModel model = new SessionModel();
+            model.TimeOut = false;
+            model.UserKey = userKey;
+            model.Obj = userInfo;
+            model.Ticket = ticket;
+            model.LastOprTime = DateTime.Now;
+            lock (lockObj)
+            {
+                list.Add(model);
             }
         }
-        public static void Login<T>(this HttpActionContext actionContext, T user)
+    }
+    public static void Logout(string userKey)
+    {
+        lock (lockObj)
         {
-            string ticket = GetHeadersTicket(actionContext);
-            var tmp = list.Find(a => a.Ticket == ticket);
-            if (tmp != null)
+            list.RemoveAll(o => o.UserKey == userKey);
+        }
+    }
+    public static void Logout(this HttpActionContext actionContext)
+    {
+        string ticket = GetHeadersTicket(actionContext);
+        var tmp = list.Find(a => a.Ticket == ticket);
+        if (tmp != null)
+        {
+            lock (lockObj)
+            {
+                list.Remove(tmp);
+            }
+        }
+    }
+    public static bool IsLogin(this HttpActionContext actionContext)
+    {
+        string ticket = GetHeadersTicket(actionContext);
+        var tmp = list.Find(a => a.Ticket == ticket);
+        if (tmp != null)
+        {
+            if (!tmp.TimeOut)
             {
                 lock (lockObj)
                 {
                     tmp.LastOprTime = DateTime.Now;
-                    tmp.TimeOut = false;
-                    tmp.Obj = user;
                 }
-
-            }
-            else
-            {
-                SessionModel model = new SessionModel();
-                model.TimeOut = false;
-                model.Obj = user;
-                model.Ticket = ticket;
-                model.LastOprTime = DateTime.Now;
-                lock (lockObj)
-                {
-                    list.Add(model);
-                }
+                return true;
             }
         }
-        public static void Logout(this HttpActionContext actionContext)
+        return false;
+    }
+    public static T GetUserInfo<T>(this HttpActionContext actionContext)
+    {
+        string ticket = GetHeadersTicket(actionContext);
+        var tmp = list.Find(a => a.Ticket == ticket);
+        if (tmp != null)
         {
-            string ticket = GetHeadersTicket(actionContext);
-            var tmp = list.Find(a => a.Ticket == ticket);
-            if (tmp != null)
-            {
-                lock (lockObj)
-                {
-                    list.Remove(tmp);
-                }
-            }
+            return (T)tmp.Obj;
         }
-        public static bool IsLogin(this HttpActionContext actionContext)
+        else
         {
-            string ticket = GetHeadersTicket(actionContext);
-            var tmp = list.Find(a => a.Ticket == ticket);
-            if (tmp != null)
-            {
-                if (!tmp.TimeOut)
-                {
-                    lock (lockObj)
-                    {
-                        tmp.LastOprTime = DateTime.Now;
-                    }
-                    return true;
-                }
-            }
-            return false;
+            return default(T);
         }
-        public static T GetUser<T>(this HttpActionContext actionContext)
+    }
+    public static string GetUserKey(this HttpActionContext actionContext)
+    {
+        string ticket = GetHeadersTicket(actionContext);
+        var tmp = list.Find(a => a.Ticket == ticket);
+        if (tmp != null)
         {
-            string ticket = GetHeadersTicket(actionContext);
-            var tmp = list.Find(a => a.Ticket == ticket);
-            if (tmp != null)
-            {
-                return (T)tmp.Obj;
-            }
-            else
-            {
-                return default(T);
-            }
-
+            return tmp.UserKey;
         }
-        public static string GetHeadersTicket(this HttpActionContext actionContext)
+        else
         {
-            IEnumerable<string> values = null;
-            if (actionContext.Request.Headers.TryGetValues("ticket",out values))
-            {
-                //判断是否授权
-                return values.FirstOrDefault();
-            }
-            else
-            {
-                return null;
-            }
+            return "";
         }
-        public static void Set(this HttpActionContext actionContext, string key, object value)
+    }
+    public static string GetHeadersTicket(this HttpActionContext actionContext)
+    {
+        IEnumerable<string> values = null;
+        if (actionContext.Request.Headers.TryGetValues("ticket", out values))
         {
-            string ticket = GetHeadersTicket(actionContext);
-            var tmp = list.Find(a => a.Ticket == ticket);
-            if (tmp != null)
-            {
-                tmp.sessionData.Add(key, value);
-            }
+            //判断是否授权
+            return values.FirstOrDefault();
         }
-        public static object Get(this HttpActionContext actionContext, string key)
+        else
         {
-            string ticket = GetHeadersTicket(actionContext);
-            var tmp = list.Find(a => a.Ticket == ticket);
-            if (tmp != null)
-            {
-                return tmp.sessionData[key];
-            }
             return null;
         }
     }
+    public static bool Set(this HttpActionContext actionContext, string key, object value)
+    {
+        string ticket = GetHeadersTicket(actionContext);
+        var tmp = list.Find(a => a.Ticket == ticket);
+        if (tmp != null)
+        {
+            tmp.SessionData.Add(key, value);
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+    public static bool TryGet<T>(this HttpActionContext actionContext, string key, out T value)
+    {
+        value = default(T);
+        object outValue = null;
+        if (TryGet(actionContext, key, out outValue))
+        {
+            value = (T)outValue;
+            return true;
+        }
+        return false;
+    }
+    public static bool TryGet(this HttpActionContext actionContext, string key, out object value)
+    {
+        value = null;
+        string ticket = GetHeadersTicket(actionContext);
+        var tmp = list.Find(a => a.Ticket == ticket);
+        if (tmp != null)
+        {
+            value = tmp.SessionData[key];
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+}
 public class SessionModel
 {
     public string Ticket { get; set; }
     public DateTime LastOprTime { get; set; }
     public object Obj { get; set; }
     public bool TimeOut { get; set; }
-    public Hashtable sessionData { get; set; }
+    public Hashtable SessionData { get; set; }
+    public string UserKey { get; set; }
 }

@@ -24,7 +24,10 @@ namespace WebApiHelpers
         private object LockObject = new object();
         public void Configuration(IAppBuilder app)
         {
-            
+            if (!Directory.Exists(startUpPath))
+            {
+                Directory.CreateDirectory(startUpPath);
+            }
             config.Services.Replace(typeof(IAssembliesResolver), new ExtendedDefaultAssembliesResolver());
             config.IncludeErrorDetailPolicy = IncludeErrorDetailPolicy.Never;
             config.Filters.Add(new ExceptionActionFilter());
@@ -39,19 +42,18 @@ namespace WebApiHelpers
             {
                 DateTimeFormat = "yyyy-MM-dd HH:mm:ss"
             });
+            
             //config.Filters.Add(new ApiAuthorizeAttribute(new string[] { "User/UserLogin", "User/GetTicket", "User/IsLogin" }));
             app.UseWebApi(config);
 
-            bool IsCache = false;
-            try
-            {
-                IsCache = ConfigurationManager.AppSettings.GetValues("IsCache")[0] == "true" ? true : false;
-            }
-            catch { }
+            bool IsCache = StartClass.Instance.Config.Get("WebInfo", "CacheFile", "false") == "true" ? true : false;
+            string defaultPathFile = StartClass.Instance.Config.Get("WebInfo", "DefaultPage", "index.html");
+            string file404= StartClass.Instance.Config.Get("WebInfo", "File_404", "404.html"); ;
             app.Run(context =>
             {
 
-                string path = "index.html";
+                string path = defaultPathFile;
+
                 context.Response.StatusCode = 200;
                 if (context.Request.Path.Value != "/")
                 {
@@ -59,12 +61,11 @@ namespace WebApiHelpers
                     {
                         path = context.Request.Path.Value;
                     }
-                        
                 }
 
                 if (!File.Exists(startUpPath + path))
                 {
-                    path = "404.html";
+                    path = file404;
                 }
 
                 FileInfo fileInfo = new FileInfo(startUpPath + path);
@@ -79,7 +80,6 @@ namespace WebApiHelpers
                             pageCache.Add(path, msg);
                         }
                     }
-
                     msg = pageCache[path];
                 }
                 else
