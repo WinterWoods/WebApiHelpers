@@ -165,6 +165,7 @@ public static class SessionManager
         var tmp = list.Find(a => a.Ticket == ticket);
         if (tmp != null)
         {
+            tmp.SessionData.Remove(key);
             tmp.SessionData.Add(key, value);
             return true;
         }
