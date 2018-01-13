@@ -180,7 +180,15 @@ public static class SessionManager
         object outValue = null;
         if (TryGet(actionContext, key, out outValue))
         {
-            value = (T)outValue;
+            if (outValue == null)
+            {
+                value = default(T);
+            }
+            else
+            {
+                value = (T)outValue;
+            }
+            
             return true;
         }
         return false;
