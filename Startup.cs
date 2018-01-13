@@ -48,10 +48,29 @@ namespace WebApiHelpers
 
             bool IsCache = StartClass.Instance.Config.Get("WebInfo", "CacheFile", "false") == "true" ? true : false;
             string defaultPathFile = StartClass.Instance.Config.Get("WebInfo", "DefaultPage", "index.html");
-            string file404= StartClass.Instance.Config.Get("WebInfo", "File_404", "404.html"); ;
+            string file404= StartClass.Instance.Config.Get("WebInfo", "File_404", "404.html");
+            //检测是否监听https,如果监听,自动跳转到https
+            bool AutoRedirect = StartClass.Instance.Config.Get("WebInfo", "AutoRedirectHttps", "true") == "true" ? true : false;
+            var httpUrls = StartClass.Instance.Config.Get("WebInfo", "AutoRedirectHttps", "http://127.0.0.1:8080");
+            var urls = httpUrls.Split(new char[] { ',' });
+            var httpsUrl = string.Empty;
+            if (urls.Any(a => a.StartsWith("https")))
+            {
+                httpsUrl = urls.FirstOrDefault(f => f.StartsWith("https"));
+            }
             app.Run(context =>
             {
-
+                
+                if (AutoRedirect)
+                {
+                    if (context.Request.Scheme == "http")
+                    {
+                        context.Response.Redirect(httpsUrl);
+                        return context.Response.WriteAsync("");
+                    }
+                    
+                }
+                
                 string path = defaultPathFile;
 
                 context.Response.StatusCode = 200;

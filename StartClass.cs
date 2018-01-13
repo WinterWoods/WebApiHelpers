@@ -55,11 +55,16 @@ namespace WebApiHelpers
                 Directory.SetCurrentDirectory(file.DirectoryName);
                 Log = new ConsoleHelper();
                 Log.WriteInfo("获取启动地址");
-                string httpUrl = Config.Get("WebInfo", "Url", "http://127.0.0.1:8080");
-
-
-                WebApp.Start(httpUrl);
-                Log.WriteInfo("启动成功:" + httpUrl);
+                string httpUrls = Config.Get("WebInfo", "Url", "http://127.0.0.1:8080");
+                var urls= httpUrls.Split(new char[] { ',' });
+                StartOptions startOptions = new StartOptions();
+                foreach (var url in urls)
+                {
+                    startOptions.Urls.Add(url);
+                }
+                
+                WebApp.Start(startOptions);
+                Log.WriteInfo("启动成功:" + httpUrls);
             }
             catch (Exception e)
             {
