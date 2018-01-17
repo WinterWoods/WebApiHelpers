@@ -71,7 +71,10 @@ public static class PagedHelper
             source = source.Skip((page.currentPage - 1) * page.pageSize);
         }
 
-
+        result.currentPage = page.currentPage;
+        result.pageSize = page.pageSize;
+        result.sortField = page.sortField;
+        result.sortOrder = page.sortOrder;
 
         result.data = source.ToList();
         result.totalCount = count;
