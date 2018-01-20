@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Http.Controllers;
-
+using WebApiHelpers;
 
 public static class SessionManager
 {
@@ -25,6 +25,7 @@ public static class SessionManager
              {
                  list.RemoveAll(r => (DateTime.Now - r.LastOprTime) > new TimeSpan(0, SessionOutTimer, 0));
              }
+             StartClass.Instance.Log.WriteInfo("当前在线人数:" + list.Count);
          });
         timer.Start();
     }
@@ -88,7 +89,16 @@ public static class SessionManager
     {
         lock (lockObj)
         {
-            list.RemoveAll(o => o.UserKey == userKey);
+           var tmp = list.Find(o => o.UserKey == userKey);
+            if (tmp != null)
+            {
+                lock (lockObj)
+                {
+                    tmp.TimeOut = true;
+                    tmp.Obj = null;
+                    tmp.UserKey = "";
+                }
+            }
         }
     }
     public static void Logout(this HttpActionContext actionContext)
@@ -99,7 +109,9 @@ public static class SessionManager
         {
             lock (lockObj)
             {
-                list.Remove(tmp);
+                tmp.TimeOut = true;
+                tmp.Obj = null;
+                tmp.UserKey = "";
             }
         }
     }
