@@ -17,7 +17,7 @@ namespace WebApiHelpers
 {
     public class Startup
     {
-        public static string startUpPath = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + "\\www\\";
+        public static string startUpPath = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + "\\www\\";
         public static Dictionary<string, byte[]> pageCache = new Dictionary<string, byte[]>();
         public static bool StartCache { get; set; }
         public static HttpConfiguration config = new HttpConfiguration();
@@ -60,14 +60,6 @@ namespace WebApiHelpers
             }
             app.Run(context =>
             {
-                
-                if (AutoRedirect&&!string.IsNullOrEmpty(httpsUrl)&& context.Request.Scheme == "http")
-                {
-                    context.Response.Redirect(httpsUrl);
-                    context.Response.StatusCode = 307;
-                    return context.Response.WriteAsync("auto redirect https url");
-                }
-                
                 string path = defaultPathFile;
 
                 context.Response.StatusCode = 200;
@@ -105,6 +97,15 @@ namespace WebApiHelpers
                     else
                         msg = new byte[0];
                 }
+
+                if (AutoRedirect && !string.IsNullOrEmpty(httpsUrl) && context.Request.Scheme == "http")
+                {
+                    context.Response.Redirect(httpsUrl + context.Request.Path.Value);
+                    context.Response.StatusCode = 301;
+                    return context.Response.WriteAsync(msg);
+                }
+
+
                 context.Response.ContentType = MimeMapping.GetMimeMapping(fileInfo.Name);
                 context.Response.StatusCode = 200;
                 context.Response.ContentLength = msg.Length;
