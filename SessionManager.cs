@@ -67,7 +67,8 @@ public static class SessionManager
                 tmp.LastOprTime = DateTime.Now;
                 tmp.TimeOut = false;
                 tmp.UserKey = userKey;
-                tmp.Obj = userInfo;
+                T t = userInfo;
+                tmp.Obj = t;
             }
 
         }
